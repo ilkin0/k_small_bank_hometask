@@ -1,7 +1,9 @@
 spring:
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
-    url: ${DATASOURCE_URL}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/k_small_banking_rest}
+    username: ${SPRING_DATASOURCE_USERNAME:small_bank}
+    password: ${SPRING_DATASOURCE_PASSWORD:small_bank}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5

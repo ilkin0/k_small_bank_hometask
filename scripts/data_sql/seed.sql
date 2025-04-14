@@ -1,0 +1,1 @@
+CREATE DATABASE k_small_banking_rest IF NOT EXIST WITH OWNER small_bank;
