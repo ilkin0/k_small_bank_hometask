@@ -28,12 +28,8 @@ logging:
   level:
     root: INFO
     org:
-      hibernate:
-        SQL: WARN
-        type.descriptor.sql.BasicBinder: WARN
       springframework:
         security: WARN
         web: INFO
-    gg.jte: WARN
     com:
       ilkinmehdiyev: INFO
