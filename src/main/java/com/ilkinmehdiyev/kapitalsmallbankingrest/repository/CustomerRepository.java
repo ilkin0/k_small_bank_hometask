@@ -19,9 +19,9 @@ public class CustomerRepository {
                 .sql("""
                         SELECT * FROM customers
                         WHERE uid = :uid
-                        FOR KEY UPDATE
+                        FOR UPDATE
                         """)
-                .param("id", accountUid)
+                .param("uid", accountUid)
                 .query(Customer.class)
                 .optional();
     }
