@@ -22,7 +22,7 @@ public class AbstractBaseRepository {
   public static final String TRANSACTION_DATE = "transaction_date";
   public static final String TRANSACTION_TYPE = "type";
   public static final String TRANSACTION_STATUS = "status";
-  public static final String REFERENCE_ID = "reference_id";
+  public static final String REFERENCE_ID = "reference_uid";
 
   protected Map<String, Object> tnxSqlParameters(@NotNull Transaction transaction) {
     final Map<String, Object> params = new HashMap<>();
@@ -30,7 +30,7 @@ public class AbstractBaseRepository {
     nullSafePut(params, ID, transaction.id());
     nullSafePut(params, UID, transaction.uid());
     nullSafePut(params, CUSTOMER_ID, transaction.customerId());
-    nullSafePut(params, REFERENCE_ID, transaction.referenceId());
+    nullSafePut(params, REFERENCE_ID, transaction.referenceUid());
     nullSafePut(
         params, TRANSACTION_STATUS, Optional.ofNullable(transaction.status()).map(Enum::toString));
     nullSafePut(
