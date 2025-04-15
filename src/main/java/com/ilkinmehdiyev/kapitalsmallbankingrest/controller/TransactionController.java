@@ -1,6 +1,6 @@
 package com.ilkinmehdiyev.kapitalsmallbankingrest.controller;
 
-import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TopUpRequest;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.service.TransactionService;
 import jakarta.validation.Valid;
@@ -17,16 +17,16 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/v1/account")
+@RequestMapping("/api/v1/transactions")
 public class TransactionController {
   private final TransactionService transactionService;
 
-  @PostMapping("/topup")
+  @PostMapping
   public ResponseEntity<TransactionResponse> topUpAccount(
       @RequestHeader("x-idempotency-key") UUID idempotencyKey,
-      @Valid @RequestBody TopUpRequest request) {
+      @Valid @RequestBody TransactionRequest request) {
     log.info("Top up account request received");
-    var response = transactionService.topUpCustomer(request, idempotencyKey);
+    var response = transactionService.processTransaction(request, idempotencyKey);
 
     return ResponseEntity.ok(response);
   }
