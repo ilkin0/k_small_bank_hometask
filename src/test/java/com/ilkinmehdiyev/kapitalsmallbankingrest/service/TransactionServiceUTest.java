@@ -11,6 +11,7 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.CustomerNotFoundException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.NoDataFoundException;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransactionException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransferRequestException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Customer;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
@@ -68,7 +69,7 @@ class TransactionServiceUTest {
             "Test transaction",
             Instant.now(),
             TransactionStatus.COMPLETED,
-            "");
+            null);
   }
 
   @Test
@@ -215,5 +216,231 @@ class TransactionServiceUTest {
     assertThatThrownBy(() -> transactionService.processTransaction(negativeRequest, idempotencyKey))
         .isInstanceOf(TransferRequestException.class)
         .hasMessageContaining("Amount must be greater than zero");
+  }
+
+  @Test
+  @DisplayName("Should successfully process a partial refund transaction")
+  void shouldProcessPartialRefundTransaction() {
+    UUID referenceTransactionUid = UUID.randomUUID();
+    Transaction referenceTransaction =
+        new Transaction(
+            referenceTransactionUid,
+            1L,
+            TransactionType.PURCHASE,
+            new BigDecimal("100.00"),
+            "Original purchase",
+            Instant.now(),
+            TransactionStatus.COMPLETED,
+            null);
+
+    BigDecimal refundAmount = new BigDecimal("30.00");
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, referenceTransactionUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid))
+        .thenReturn(Optional.of(referenceTransaction));
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+        .thenReturn(BigDecimal.ZERO);
+    when(transactionRepository.processTransactionByCustomerId(
+            testCustomer.id(), request, idempotencyKey))
+        .thenReturn(
+            new TransactionResponse(UUID.randomUUID(), TransactionStatus.REFUNDED, Instant.now()));
+
+    TransactionResponse response = transactionService.processTransaction(request, idempotencyKey);
+
+    assertThat(response).isNotNull();
+    assertThat(response.status()).isEqualTo(TransactionStatus.REFUNDED);
+
+    verify(transactionRepository).findByUid(referenceTransactionUid);
+    verify(transactionRepository).getTotalRefundedAmountBy(referenceTransactionUid);
+    verify(transactionRepository)
+        .processTransactionByCustomerId(testCustomer.id(), request, idempotencyKey);
+  }
+
+  @Test
+  @DisplayName("Should throw exception when refund amount exceeds original transaction amount")
+  void shouldThrowExceptionWhenRefundAmountExceedsOriginalAmount() {
+    UUID referenceTransactionUid = UUID.randomUUID();
+    Transaction referenceTransaction =
+        new Transaction(
+            referenceTransactionUid,
+            1L,
+            TransactionType.PURCHASE,
+            new BigDecimal("50.00"),
+            "Original purchase",
+            Instant.now(),
+            TransactionStatus.COMPLETED,
+            null);
+
+    BigDecimal refundAmount = new BigDecimal("75.00");
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, referenceTransactionUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid))
+        .thenReturn(Optional.of(referenceTransaction));
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+        .thenReturn(BigDecimal.ZERO);
+
+    assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
+        .isInstanceOf(TransactionException.class)
+        .hasMessageContaining("exceed original transaction amount");
+  }
+
+  @Test
+  @DisplayName("Should throw exception when refunding a non-purchase transaction")
+  void shouldThrowExceptionWhenRefundingNonPurchaseTransaction() {
+    UUID referenceTransactionUid = UUID.randomUUID();
+    Transaction referenceTransaction =
+        new Transaction(
+            referenceTransactionUid,
+            1L,
+            TransactionType.TOP_UP,
+            new BigDecimal("100.00"),
+            "Original top-up",
+            Instant.now(),
+            TransactionStatus.COMPLETED,
+            null);
+
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND,
+            customerUid,
+            new BigDecimal("30.00"),
+            referenceTransactionUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid))
+        .thenReturn(Optional.of(referenceTransaction));
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+        .thenReturn(BigDecimal.ZERO);
+
+    assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
+        .isInstanceOf(TransactionException.class)
+        .hasMessageContaining("Only purchase transactions can be refunded");
+  }
+
+  @Test
+  @DisplayName("Should throw exception when reference transaction is not in COMPLETED status")
+  void shouldThrowExceptionWhenReferenceTransactionNotCompleted() {
+    UUID referenceTransactionUid = UUID.randomUUID();
+    Transaction referenceTransaction =
+        new Transaction(
+            referenceTransactionUid,
+            1L,
+            TransactionType.PURCHASE,
+            new BigDecimal("100.00"),
+            "Pending purchase",
+            Instant.now(),
+            TransactionStatus.PENDING,
+            null);
+
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND,
+            customerUid,
+            new BigDecimal("30.00"),
+            referenceTransactionUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid))
+        .thenReturn(Optional.of(referenceTransaction));
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+        .thenReturn(BigDecimal.ZERO);
+
+    assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
+        .isInstanceOf(TransactionException.class)
+        .hasMessageContaining("not COMPLETED");
+  }
+
+  @Test
+  @DisplayName("Should throw exception when total refunds would exceed original amount")
+  void shouldThrowExceptionWhenTotalRefundsExceedOriginalAmount() {
+    UUID referenceTransactionUid = UUID.randomUUID();
+    Transaction referenceTransaction =
+        new Transaction(
+            referenceTransactionUid,
+            1L,
+            TransactionType.PURCHASE,
+            new BigDecimal("100.00"),
+            "Original purchase",
+            Instant.now(),
+            TransactionStatus.COMPLETED,
+            null);
+
+    BigDecimal previousRefunds = new BigDecimal("80.00");
+    BigDecimal refundAmount = new BigDecimal("30.00");
+
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, referenceTransactionUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid))
+        .thenReturn(Optional.of(referenceTransaction));
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+        .thenReturn(previousRefunds);
+
+    assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
+        .isInstanceOf(TransactionException.class)
+        .hasMessageContaining("Total refunded amount");
+  }
+
+  @Test
+  @DisplayName("Should throw exception when refund reference transaction is not found")
+  void shouldThrowExceptionWhenRefundReferenceTransactionNotFound() {
+    UUID nonExistentReferenceUid = UUID.randomUUID();
+
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND,
+            customerUid,
+            new BigDecimal("30.00"),
+            nonExistentReferenceUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(nonExistentReferenceUid)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
+        .isInstanceOf(NoDataFoundException.class)
+        .hasMessageContaining("Refund transaction with Reference uid");
+  }
+
+  @Test
+  @DisplayName("Should throw exception when refund reference UID is null")
+  void shouldThrowExceptionWhenRefundReferenceUidIsNull() {
+    TransactionRequest request =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND, customerUid, new BigDecimal("30.00"), null);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    when(customerRepository.getCustomerByUidForUpdate(customerUid))
+        .thenReturn(Optional.of(testCustomer));
+    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
+        .isInstanceOf(NoDataFoundException.class)
+        .hasMessageContaining("Reference transaction ID is required");
   }
 }

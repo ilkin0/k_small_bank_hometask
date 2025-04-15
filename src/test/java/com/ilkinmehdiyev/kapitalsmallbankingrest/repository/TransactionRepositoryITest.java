@@ -16,6 +16,7 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,9 +33,7 @@ import org.springframework.test.context.jdbc.Sql;
 @SpringBootTest
 @ContextConfiguration(initializers = {PostgresSQLEmbeddedContainer.Initializer.class})
 @Import(TestLiquibaseConfig.class)
-@Sql(
-    scripts = "/sql/init-test-db.sql",
-    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
+@Sql(scripts = "/sql/init-test-db.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class TransactionRepositoryITest {
 
   @Autowired private JdbcClient jdbcClient;
@@ -86,7 +85,7 @@ class TransactionRepositoryITest {
             "Purchase transaction",
             Instant.now(),
             TransactionStatus.PENDING,
-            "");
+            null);
 
     UUID result = transactionRepository.insertTransaction(transaction);
 
@@ -247,5 +246,124 @@ class TransactionRepositoryITest {
     repositorySpy.processTransactionByCustomerId(customerId, request, idempotencyKey);
     verify(repositorySpy)
         .updateTransactionStatusBy(testTransactionUid, TransactionStatus.COMPLETED);
+  }
+
+  @Test
+  @DisplayName("Should process partial refund and return successful response")
+  void shouldProcessPartialRefundAndReturnSuccessfulResponse() {
+    UUID purchaseTransactionUid = UUID.randomUUID();
+    Transaction purchaseTransaction =
+        new Transaction(
+            purchaseTransactionUid,
+            customerId,
+            TransactionType.PURCHASE,
+            new BigDecimal("80.00"),
+            "Purchase transaction",
+            Instant.now(),
+            TransactionStatus.COMPLETED,
+            null);
+
+    transactionRepository.insertTransaction(purchaseTransaction);
+
+    var oldBalanceOptional =
+        jdbcClient
+            .sql("SELECT balance FROM customers WHERE id = :customerId")
+            .param("customerId", customerId)
+            .query(BigDecimal.class)
+            .optional();
+
+    assertThat(oldBalanceOptional).isPresent();
+    BigDecimal oldBalance = oldBalanceOptional.get();
+
+    BigDecimal refundAmount = new BigDecimal("30.00");
+    TransactionRequest refundRequest =
+        new TransactionRequest(
+            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, purchaseTransactionUid);
+    UUID idempotencyKey = UUID.randomUUID();
+
+    TransactionResponse response =
+        transactionRepository.processTransactionByCustomerId(
+            customerId, refundRequest, idempotencyKey);
+
+    assertThat(response).isNotNull();
+    assertThat(response.transactionUid()).isNotNull();
+    assertThat(response.status()).isEqualTo(TransactionStatus.REFUNDED);
+
+    var updatedBalanceOptional =
+        jdbcClient
+            .sql("SELECT balance FROM customers WHERE id = :customerId")
+            .param("customerId", customerId)
+            .query(BigDecimal.class)
+            .optional();
+
+    BigDecimal expectedNewBalance = oldBalance.add(refundAmount);
+    assertThat(updatedBalanceOptional).isPresent().hasValue(expectedNewBalance);
+
+    Optional<Transaction> savedRefundTransaction =
+        transactionRepository.findByUid(response.transactionUid());
+    assertThat(savedRefundTransaction).isPresent();
+    assertThat(savedRefundTransaction.get().type()).isEqualTo(TransactionType.PARTIAL_REFUND);
+    assertThat(savedRefundTransaction.get().amount()).isEqualByComparingTo(refundAmount);
+    assertThat(savedRefundTransaction.get().referenceUid()).isEqualTo(purchaseTransactionUid);
+  }
+
+  @Test
+  @DisplayName("Should calculate total refunded amount correctly")
+  void shouldCalculateTotalRefundedAmountCorrectly() {
+    UUID purchaseTransactionUid = UUID.randomUUID();
+    Transaction purchaseTransaction =
+        new Transaction(
+            purchaseTransactionUid,
+            customerId,
+            TransactionType.PURCHASE,
+            new BigDecimal("100.00"),
+            "Purchase transaction",
+            Instant.now(),
+            TransactionStatus.COMPLETED,
+            null);
+
+    transactionRepository.insertTransaction(purchaseTransaction);
+
+    UUID firstRefundUid = UUID.randomUUID();
+
+    jdbcClient
+        .sql(
+            "INSERT INTO transactions (uid, customer_id, type, amount, description, "
+                + "transaction_date, status, reference_uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .params(
+            firstRefundUid,
+            customerId,
+            TransactionType.PARTIAL_REFUND.toString(),
+            new BigDecimal("30.00"),
+            "First refund",
+            Timestamp.from(Instant.now()),
+            TransactionStatus.REFUNDED.toString(),
+            purchaseTransactionUid)
+        .update();
+
+    BigDecimal totalRefunded =
+        transactionRepository.getTotalRefundedAmountBy(purchaseTransactionUid);
+    assertThat(totalRefunded).isEqualByComparingTo(new BigDecimal("30.00"));
+
+    UUID secondRefundUid = UUID.randomUUID();
+
+    jdbcClient
+        .sql(
+            "INSERT INTO transactions (uid, customer_id, type, amount, description, "
+                + "transaction_date, status, reference_uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .params(
+            secondRefundUid,
+            customerId,
+            TransactionType.PARTIAL_REFUND.toString(),
+            new BigDecimal("20.00"),
+            "Second refund",
+            Timestamp.from(Instant.now()),
+            TransactionStatus.REFUNDED.toString(),
+            purchaseTransactionUid)
+        .update();
+
+    BigDecimal updatedTotalRefunded =
+        transactionRepository.getTotalRefundedAmountBy(purchaseTransactionUid);
+    assertThat(updatedTotalRefunded).isEqualByComparingTo(new BigDecimal("50.00"));
   }
 }

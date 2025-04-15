@@ -6,18 +6,18 @@ CREATE TABLE transactions
     id               BIGSERIAL PRIMARY KEY NOT NULL,
     uid              UUID                  NOT NULL,
     customer_id      BIGINT                NOT NULL,
-    type             VARCHAR(10)           NOT NULL,
+    type             VARCHAR(16)           NOT NULL,
     amount           DECIMAL               NOT NULL,
     description      VARCHAR(255),
     transaction_date TIMESTAMPTZ           NOT NULL DEFAULT now(),
-    reference_id     VARCHAR(50),
+    reference_uid    UUID,
     status           VARCHAR(10)           NOT NULL,
     created_at       TIMESTAMPTZ           NOT NULL DEFAULT now(),
     created_by       VARCHAR(50)           NOT NULL DEFAULT 'system',
 
     CONSTRAINT fk_transactions_customer FOREIGN KEY (customer_id) REFERENCES customers (id),
-    CONSTRAINT chk_transaction_type CHECK (type IN ('TOP_UP', 'PURCHASE', 'REFUND')),
-    CONSTRAINT chk_transaction_status CHECK (status IN ('COMPLETED', 'FAILED', 'PENDING')),
+    CONSTRAINT chk_transaction_type CHECK (type IN ('TOP_UP', 'PURCHASE', 'REFUND', 'PARTIAL_REFUND')),
+    CONSTRAINT chk_transaction_status CHECK (status IN ('COMPLETED', 'FAILED', 'PENDING', 'REFUNDED')),
     CONSTRAINT uq_idempotency_key UNIQUE (uid)
 );
 

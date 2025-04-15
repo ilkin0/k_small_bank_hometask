@@ -71,6 +71,17 @@ public class TransactionRepository extends AbstractBaseRepository {
         .optional();
   }
 
+  public BigDecimal getTotalRefundedAmountBy(UUID referenceUid) {
+    return jdbcClient
+        .sql(
+            "SELECT COALESCE(SUM(amount), 0) FROM transactions "
+                + "WHERE reference_uid = :referenceId AND type = 'PARTIAL_REFUND' AND status IN ('COMPLETED', 'REFUNDED', 'PENDING')")
+        .param("referenceId", referenceUid)
+        .query(BigDecimal.class)
+        .optional()
+        .orElse(BigDecimal.ZERO);
+  }
+
   public TransactionResponse processTransactionByCustomerId(
       Long customerId, TransactionRequest transactionRequest, UUID idempotencyKey) {
     BigDecimal amount = getTransactionAmount(transactionRequest);
@@ -88,20 +99,25 @@ public class TransactionRepository extends AbstractBaseRepository {
       throw new TransactionException("Could not update Transaction: [%s]".formatted(tnxUid));
     }
 
-    boolean tnxUpdated = updateTransactionStatusBy(tnxUid, TransactionStatus.COMPLETED);
+    var newTnxStatus =
+        Objects.equals(transactionRequest.transactionType(), TransactionType.PARTIAL_REFUND)
+            ? TransactionStatus.REFUNDED
+            : TransactionStatus.COMPLETED;
+
+    boolean tnxUpdated = updateTransactionStatusBy(tnxUid, newTnxStatus);
     if (!tnxUpdated) {
       log.error("Could not update Transaction: [{}]", tnxUid);
       throw new TransactionException("Could not update Transaction: [%s]".formatted(tnxUid));
     }
 
-    return new TransactionResponse(tnxUid, TransactionStatus.COMPLETED, tnx.transactionDate());
+    return new TransactionResponse(tnxUid, newTnxStatus, tnx.transactionDate());
   }
 
   private static BigDecimal getTransactionAmount(TransactionRequest transactionRequest) {
-    if (TransactionType.TOP_UP.equals(transactionRequest.transactionType())) {
-      return transactionRequest.amount();
-    } else {
+    if (TransactionType.PURCHASE.equals(transactionRequest.transactionType())) {
       return transactionRequest.amount().negate();
+    } else {
+      return transactionRequest.amount();
     }
   }
 
@@ -116,6 +132,6 @@ public class TransactionRepository extends AbstractBaseRepository {
         type.toString(),
         Instant.now(),
         TransactionStatus.PENDING,
-        "");
+        request.referenceUid());
   }
 }

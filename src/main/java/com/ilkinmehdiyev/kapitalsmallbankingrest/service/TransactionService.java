@@ -4,8 +4,10 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.CustomerNotFoundException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.NoDataFoundException;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransactionException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransferRequestException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.CustomerRepository;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.TransactionRepository;
@@ -49,10 +51,71 @@ public class TransactionService {
                   return new CustomerNotFoundException(
                       "Customer with id: [%s] not found".formatted(customerUid));
                 });
+
     validateCustomerBalance(customer.balance(), request);
+    if (TransactionType.PARTIAL_REFUND.equals(request.transactionType())) {
+      validateRefundTransaction(request.amount(), request.referenceUid(), customer.id());
+    }
 
     return transactionRepository.processTransactionByCustomerId(
         customer.id(), request, idempotencyKey);
+  }
+
+  private void validateRefundTransaction(
+      BigDecimal refundAmount, UUID referenceUid, Long customerId) {
+    if (Objects.isNull(referenceUid)) {
+      log.error("Reference transaction ID is required for refunds");
+      throw new NoDataFoundException("Reference transaction ID is required for refunds");
+    }
+
+    Transaction originalTnx =
+        transactionRepository
+            .findByUid(referenceUid)
+            .orElseThrow(
+                () -> {
+                  log.error("Refund transaction with Reference uid {} not found", referenceUid);
+                  return new NoDataFoundException(
+                      "Refund transaction with Reference uid %s not found".formatted(referenceUid));
+                });
+
+    validateTotalRefundAmount(referenceUid, originalTnx.amount(), refundAmount);
+
+    if (!originalTnx.customerId().equals(customerId)) {
+      log.error("Refund must be issued to the original customer");
+      throw new TransactionException("Refund must be issued to the original customer");
+    }
+
+    if (!TransactionType.PURCHASE.equals(originalTnx.type())) {
+      log.error("Only purchase transactions can be refunded");
+      throw new TransactionException("Only purchase transactions can be refunded");
+    }
+
+    if (refundAmount.compareTo(originalTnx.amount()) > 0) {
+      log.error(
+          "Refund transaction with Refund amount [{}] exceeded original Transaction amount [{}]",
+          refundAmount,
+          originalTnx.amount());
+      throw new TransactionException(
+          "Refund transaction with Refund amount [%f] exceeded original Transaction amount [%f]"
+              .formatted(refundAmount, originalTnx.amount()));
+    }
+
+    if (!TransactionStatus.COMPLETED.equals(originalTnx.status())) {
+      log.error("Refund transaction with Status [{}] is not COMPLETED", originalTnx.status());
+      throw new TransactionException(
+          "Refund transaction with Status [%s] is not COMPLETED".formatted(originalTnx.status()));
+    }
+  }
+
+  private void validateTotalRefundAmount(
+      UUID referenceUid, BigDecimal originalAmount, BigDecimal refundAmount) {
+    var refundedAmount = transactionRepository.getTotalRefundedAmountBy(referenceUid);
+    BigDecimal totalRefAmount = refundedAmount.add(refundAmount);
+    if (totalRefAmount.compareTo(originalAmount) > 0) {
+      throw new TransactionException(
+          "Total refunded amount [%.3f] would exceed original transaction amount [%.3f]"
+              .formatted(totalRefAmount, originalAmount));
+    }
   }
 
   private void validateCustomerBalance(BigDecimal currentBalance, TransactionRequest request) {
@@ -72,7 +135,7 @@ public class TransactionService {
   private Optional<TransactionResponse> getTransactionResponseByUid(UUID idempotencyKey) {
     var transactionOptional = transactionRepository.findByUid(idempotencyKey);
     if (transactionOptional.isPresent()) {
-      log.warn("Top up request with x-idempotency [{}] already exists", idempotencyKey);
+      log.warn("Transaction with x-idempotency [{}] already exists", idempotencyKey);
       return Optional.of(mapToTransactionResponse(transactionOptional.get()));
     }
     return Optional.empty();
