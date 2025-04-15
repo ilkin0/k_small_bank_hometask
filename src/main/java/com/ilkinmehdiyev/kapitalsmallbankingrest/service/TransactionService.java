@@ -1,15 +1,17 @@
 package com.ilkinmehdiyev.kapitalsmallbankingrest.service;
 
-import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TopUpRequest;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.CustomerNotFoundException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.NoDataFoundException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransferRequestException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.CustomerRepository;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.TransactionRepository;
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,17 +26,18 @@ public class TransactionService {
   private final TransactionRepository transactionRepository;
 
   @Transactional
-  public TransactionResponse topUpCustomer(TopUpRequest request, UUID idempotencyKey) {
+  public TransactionResponse processTransaction(TransactionRequest request, UUID idempotencyKey) {
     UUID customerUid = request.customerUid();
     BigDecimal amount = request.amount();
 
     log.info("Top up customer with uid: {}", customerUid);
     validateTransactionRequest(customerUid, amount);
 
-    var transactionOptional = transactionRepository.findByUid(idempotencyKey);
-    if (transactionOptional.isPresent()) {
-      log.warn("Top up request with x-idempotency [{}] already exists", idempotencyKey);
-      return mapToTransactionResponse(transactionOptional.get());
+    Optional<TransactionResponse> transactionResponseOptional =
+        getTransactionResponseByUid(idempotencyKey);
+
+    if (transactionResponseOptional.isPresent()) {
+      return transactionResponseOptional.get();
     }
 
     var customer =
@@ -46,8 +49,33 @@ public class TransactionService {
                   return new CustomerNotFoundException(
                       "Customer with id: [%s] not found".formatted(customerUid));
                 });
+    validateCustomerBalance(customer.balance(), request);
 
-    return transactionRepository.topUpByCustomerId(customer.id(), request, idempotencyKey);
+    return transactionRepository.processTransactionByCustomerId(
+        customer.id(), request, idempotencyKey);
+  }
+
+  private void validateCustomerBalance(BigDecimal currentBalance, TransactionRequest request) {
+    if (!TransactionType.TOP_UP.equals(request.transactionType())
+        && currentBalance.compareTo(request.amount()) < 0) {
+      log.warn(
+          "Customer does not have sufficient balance, current balance: [{}], request amount: [{}]",
+          currentBalance,
+          request.amount());
+
+      throw new TransferRequestException(
+          "Customer does not have sufficient balance, current balance: [%f], request amount: [%f]"
+              .formatted(currentBalance, request.amount()));
+    }
+  }
+
+  private Optional<TransactionResponse> getTransactionResponseByUid(UUID idempotencyKey) {
+    var transactionOptional = transactionRepository.findByUid(idempotencyKey);
+    if (transactionOptional.isPresent()) {
+      log.warn("Top up request with x-idempotency [{}] already exists", idempotencyKey);
+      return Optional.of(mapToTransactionResponse(transactionOptional.get()));
+    }
+    return Optional.empty();
   }
 
   private TransactionResponse mapToTransactionResponse(Transaction transaction) {
@@ -61,7 +89,7 @@ public class TransactionService {
     }
 
     if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-      log.error("amount must be greater than zero");
+      log.error("Amount must be greater than zero");
       throw new TransferRequestException(
           "Amount must be greater than zero, amount: %f".formatted(amount));
     }

@@ -2,9 +2,8 @@ package com.ilkinmehdiyev.kapitalsmallbankingrest.repository;
 
 import static com.ilkinmehdiyev.kapitalsmallbankingrest.utils.RepositoryUtils.columnNamesFrom;
 import static com.ilkinmehdiyev.kapitalsmallbankingrest.utils.RepositoryUtils.columnValuesFrom;
-import static com.ilkinmehdiyev.kapitalsmallbankingrest.utils.RepositoryUtils.nullSafePut;
 
-import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TopUpRequest;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransactionException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
@@ -12,9 +11,7 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,29 +30,8 @@ public class TransactionRepository extends AbstractBaseRepository {
   private final JdbcClient jdbcClient;
   private final CustomerRepository customerRepository;
 
-  private static Map<String, Object> sqlParameters(@NotNull Transaction transaction) {
-    final Map<String, Object> params = new HashMap<>();
-
-    nullSafePut(params, ID, transaction.id());
-    nullSafePut(params, UID, transaction.uid());
-    nullSafePut(params, CUSTOMER_ID, transaction.customerId());
-    nullSafePut(params, REFERENCE_ID, transaction.referenceId());
-    nullSafePut(
-        params, TRANSACTION_STATUS, Optional.ofNullable(transaction.status()).map(Enum::toString));
-    nullSafePut(
-        params, TRANSACTION_TYPE, Optional.ofNullable(transaction.type()).map(Enum::toString));
-    nullSafePut(params, DESCRIPTION, transaction.description());
-    nullSafePut(params, AMOUNT, transaction.amount());
-    nullSafePut(
-        params,
-        TRANSACTION_DATE,
-        Optional.ofNullable(transaction.transactionDate()).map(Timestamp::from));
-
-    return params;
-  }
-
   public UUID insertTransaction(Transaction transaction) {
-    var params = sqlParameters(transaction);
+    var params = tnxSqlParameters(transaction);
     KeyHolder holder = new GeneratedKeyHolder();
 
     String formatted =
@@ -95,11 +71,11 @@ public class TransactionRepository extends AbstractBaseRepository {
         .optional();
   }
 
-  public TransactionResponse topUpByCustomerId(
-      Long customerId, TopUpRequest topUpRequest, UUID idempotencyKey) {
-    BigDecimal amount = topUpRequest.amount();
-    UUID customerUid = topUpRequest.customerUid();
-    var tnx = getTransaction(customerId, amount, idempotencyKey);
+  public TransactionResponse processTransactionByCustomerId(
+      Long customerId, TransactionRequest transactionRequest, UUID idempotencyKey) {
+    BigDecimal amount = getTransactionAmount(transactionRequest);
+    UUID customerUid = transactionRequest.customerUid();
+    var tnx = getTransaction(customerId, transactionRequest, idempotencyKey);
     var tnxUid = insertTransaction(tnx);
 
     boolean balanceUpdated = customerRepository.updateCustomerBalance(customerUid, amount);
@@ -121,14 +97,23 @@ public class TransactionRepository extends AbstractBaseRepository {
     return new TransactionResponse(tnxUid, TransactionStatus.COMPLETED, tnx.transactionDate());
   }
 
+  private static BigDecimal getTransactionAmount(TransactionRequest transactionRequest) {
+    if (TransactionType.TOP_UP.equals(transactionRequest.transactionType())) {
+      return transactionRequest.amount();
+    } else {
+      return transactionRequest.amount().negate();
+    }
+  }
+
   private static Transaction getTransaction(
-      Long customerId, BigDecimal amount, UUID idempotencyKey) {
+      Long customerId, TransactionRequest request, UUID idempotencyKey) {
+    TransactionType type = request.transactionType();
     return new Transaction(
         idempotencyKey,
         customerId,
-        TransactionType.TOP_UP,
-        amount,
-        TransactionType.TOP_UP.toString(),
+        type,
+        request.amount(),
+        type.toString(),
         Instant.now(),
         TransactionStatus.PENDING,
         "");
