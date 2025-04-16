@@ -20,17 +20,16 @@ spring:
     bundle:
       jks:
         server:
-          reload-on-update: true
           key:
             alias: "server"
           keystore:
-            location: "classpath:keystore.p12"
+            location: ${SSL_KEYSTORE_LOCATION:classpath:keystore.p12}
             password: "QTntL1pa4QrJcf5R"
             type: "PKCS12"
       pem:
         client:
           truststore:
-            certificate: "classpath:cert.pem"
+            certificate: ${SSL_CERT_LOCATION:classpath:cert.pem}
   threads:
     virtual:
       enabled: true
