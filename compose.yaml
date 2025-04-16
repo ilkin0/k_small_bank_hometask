@@ -1,5 +1,5 @@
 services:
-  postgres:
+  small-bank-db:
     image: 'postgres:latest'
     environment:
       - 'POSTGRES_DB=k_small_banking_rest'
@@ -9,12 +9,29 @@ services:
       - '5432:5432'
     volumes:
       - small_bank_postgres_data:/var/lib/postgresql/data
+    networks:
+      - small_bank_network
 
-
-
-
-
+  small-bank-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: k-small-bank
+    depends_on:
+      - small-bank-db
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://small-bank-db:5432/k_small_banking_rest
+      SPRING_DATASOURCE_USERNAME: small_bank
+      SPRING_DATASOURCE_PASSWORD: small_bank
+    networks:
+      - small_bank_network
 
 volumes:
   small_bank_postgres_data:
     name: small_banking_postgres_data
+
+networks:
+  small_bank_network:
+    driver: host

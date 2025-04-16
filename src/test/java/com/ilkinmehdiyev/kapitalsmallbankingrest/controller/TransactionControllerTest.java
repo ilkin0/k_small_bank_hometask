@@ -8,8 +8,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.config.TestLiquibaseConfig;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.initalizer.PostgresSQLEmbeddedContainer;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.service.TransactionService;
@@ -27,11 +29,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Profile;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
+@Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@Profile("application-test.yml")
+@ContextConfiguration(initializers = {PostgresSQLEmbeddedContainer.Initializer.class})
+@Import(TestLiquibaseConfig.class)
 class TransactionControllerTest {
 
   @LocalServerPort private int port;
