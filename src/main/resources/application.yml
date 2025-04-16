@@ -1,3 +1,8 @@
+server:
+  port: 8080
+  ssl:
+    bundle: "server"
+    enabled-protocols: TLSv1.3
 spring:
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
@@ -11,18 +16,28 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
       pool-name: HikariCP
-  jpa:
-    show-sql: false
-    hibernate:
-      ddl-auto: validate
-    generate-ddl: false
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: false
+  ssl:
+    bundle:
+      jks:
+        server:
+          reload-on-update: true
+          key:
+            alias: "server"
+          keystore:
+            location: "classpath:keystore.p12"
+            password: "QTntL1pa4QrJcf5R"
+            type: "PKCS12"
+      pem:
+        client:
+          truststore:
+            certificate: "classpath:cert.pem"
   threads:
     virtual:
       enabled: true
+  application:
+    name: k_small_banking
+  main:
+    banner-mode: off
 
 logging:
   level:
