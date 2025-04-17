@@ -15,6 +15,8 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.initalizer.PostgresSQLEmbeddedC
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.SessionUser;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.ThreadLocalStorage;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -50,12 +52,16 @@ class TransactionRepositoryITest {
   void setUp() {
     nonExistingTransactionUid = UUID.randomUUID();
     transactionRepository = new TransactionRepository(jdbcClient, customerRepository);
+
+    SessionUser sessionUser = new SessionUser(customerId, customerUid, "+994501234567");
+    ThreadLocalStorage.setSessionUser(sessionUser);
   }
 
   @Test
   @DisplayName("Should find transaction by UID when it exists")
   void shouldFindTransactionByUidWhenExists() {
-    Optional<Transaction> result = transactionRepository.findByUid(existingTransactionUid);
+    Optional<Transaction> result =
+        transactionRepository.findByUid(existingTransactionUid, customerUid);
 
     assertThat(result).isPresent();
     assertThat(result.get().uid()).isEqualTo(existingTransactionUid);
@@ -67,7 +73,8 @@ class TransactionRepositoryITest {
   @Test
   @DisplayName("Should return empty when transaction does not exist")
   void shouldReturnEmptyWhenTransactionDoesNotExist() {
-    Optional<Transaction> result = transactionRepository.findByUid(nonExistingTransactionUid);
+    Optional<Transaction> result =
+        transactionRepository.findByUid(nonExistingTransactionUid, customerUid);
 
     assertThat(result).isEmpty();
   }
@@ -91,7 +98,8 @@ class TransactionRepositoryITest {
 
     assertThat(result).isEqualTo(newTransactionUid);
 
-    Optional<Transaction> savedTransaction = transactionRepository.findByUid(newTransactionUid);
+    Optional<Transaction> savedTransaction =
+        transactionRepository.findByUid(newTransactionUid, customerUid);
     assertThat(savedTransaction).isPresent();
     assertThat(savedTransaction.get().amount()).isEqualByComparingTo(new BigDecimal("50.00"));
     assertThat(savedTransaction.get().type()).isEqualTo(TransactionType.PURCHASE);
@@ -107,7 +115,7 @@ class TransactionRepositoryITest {
     assertThat(result).isTrue();
 
     Optional<Transaction> updatedTransaction =
-        transactionRepository.findByUid(existingTransactionUid);
+        transactionRepository.findByUid(existingTransactionUid, customerUid);
     assertThat(updatedTransaction).isPresent();
     assertThat(updatedTransaction.get().status()).isEqualTo(TransactionStatus.COMPLETED);
   }
@@ -136,8 +144,7 @@ class TransactionRepositoryITest {
 
     BigDecimal topUpAmount = new BigDecimal("75.00");
 
-    TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, topUpAmount);
+    TransactionRequest request = new TransactionRequest(TransactionType.TOP_UP, topUpAmount);
     UUID idempotencyKey = UUID.randomUUID();
 
     TransactionResponse response =
@@ -173,8 +180,7 @@ class TransactionRepositoryITest {
     System.out.println("OLD BALANCE: " + oldBalanceOptional.get());
     BigDecimal purchaseAmount = new BigDecimal("50.00");
 
-    TransactionRequest request =
-        new TransactionRequest(TransactionType.PURCHASE, customerUid, purchaseAmount);
+    TransactionRequest request = new TransactionRequest(TransactionType.PURCHASE, purchaseAmount);
     UUID idempotencyKey = UUID.randomUUID();
 
     TransactionResponse response =
@@ -199,10 +205,10 @@ class TransactionRepositoryITest {
   @Test
   @DisplayName("Should throw exception when top-up balance update fails")
   void shouldThrowExceptionWhenTopUpBalanceUpdateFails() {
-    UUID nonExistentUid = UUID.randomUUID();
-
+    ThreadLocalStorage.setSessionUser(
+        new SessionUser(customerId, UUID.randomUUID(), "+994501234567"));
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, nonExistentUid, new BigDecimal("75.00"));
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("75.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     assertThatThrownBy(
@@ -216,10 +222,11 @@ class TransactionRepositoryITest {
   @Test
   @DisplayName("Should throw exception when purchase balance update fails")
   void shouldThrowExceptionWhenPurchaseBalanceUpdateFails() {
-    UUID nonExistentUid = UUID.randomUUID();
+    ThreadLocalStorage.setSessionUser(
+            new SessionUser(customerId, UUID.randomUUID(), "+994501234567"));
 
     TransactionRequest request =
-        new TransactionRequest(TransactionType.PURCHASE, nonExistentUid, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.PURCHASE, new BigDecimal("50.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     assertThatThrownBy(
@@ -240,7 +247,7 @@ class TransactionRepositoryITest {
     doReturn(true).when(repositorySpy).updateTransactionStatusBy(any(), any());
 
     TransactionRequest request =
-        new TransactionRequest(TransactionType.PURCHASE, customerUid, new BigDecimal("30.00"));
+        new TransactionRequest(TransactionType.PURCHASE, new BigDecimal("30.00"));
     UUID idempotencyKey = UUID.randomUUID();
 
     repositorySpy.processTransactionByCustomerId(customerId, request, idempotencyKey);
@@ -278,7 +285,7 @@ class TransactionRepositoryITest {
     BigDecimal refundAmount = new BigDecimal("30.00");
     TransactionRequest refundRequest =
         new TransactionRequest(
-            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, purchaseTransactionUid);
+            TransactionType.PARTIAL_REFUND, refundAmount, purchaseTransactionUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     TransactionResponse response =
@@ -300,7 +307,7 @@ class TransactionRepositoryITest {
     assertThat(updatedBalanceOptional).isPresent().hasValue(expectedNewBalance);
 
     Optional<Transaction> savedRefundTransaction =
-        transactionRepository.findByUid(response.transactionUid());
+        transactionRepository.findByUid(response.transactionUid(), customerUid);
     assertThat(savedRefundTransaction).isPresent();
     assertThat(savedRefundTransaction.get().type()).isEqualTo(TransactionType.PARTIAL_REFUND);
     assertThat(savedRefundTransaction.get().amount()).isEqualByComparingTo(refundAmount);
@@ -342,7 +349,7 @@ class TransactionRepositoryITest {
         .update();
 
     BigDecimal totalRefunded =
-        transactionRepository.getTotalRefundedAmountBy(purchaseTransactionUid);
+        transactionRepository.getTotalRefundedAmountBy(purchaseTransactionUid, customerUid);
     assertThat(totalRefunded).isEqualByComparingTo(new BigDecimal("30.00"));
 
     UUID secondRefundUid = UUID.randomUUID();
@@ -363,7 +370,7 @@ class TransactionRepositoryITest {
         .update();
 
     BigDecimal updatedTotalRefunded =
-        transactionRepository.getTotalRefundedAmountBy(purchaseTransactionUid);
+        transactionRepository.getTotalRefundedAmountBy(purchaseTransactionUid, customerUid);
     assertThat(updatedTotalRefunded).isEqualByComparingTo(new BigDecimal("50.00"));
   }
 }

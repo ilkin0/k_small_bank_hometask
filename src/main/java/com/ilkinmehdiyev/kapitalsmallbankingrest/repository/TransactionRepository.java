@@ -9,6 +9,7 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.exception.TransactionException;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.Transaction;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.ThreadLocalStorage;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -60,23 +61,34 @@ public class TransactionRepository extends AbstractBaseRepository {
     return updateCount == 1;
   }
 
-  public Optional<Transaction> findByUid(@NotNull UUID uid) {
+  public Optional<Transaction> findByUid(@NotNull UUID uid, UUID customerUid) {
     return jdbcClient
         .sql(
             """
-                        SELECT * FROM transactions WHERE uid = :uid
-                        """)
+                    SELECT *
+                    FROM transactions
+                    WHERE uid = :uid
+                        AND customer_id = (SELECT id FROM customers WHERE uid = :customerUid)
+                    """)
         .param("uid", uid)
+        .param("customerUid", customerUid)
         .query(Transaction.class)
         .optional();
   }
 
-  public BigDecimal getTotalRefundedAmountBy(UUID referenceUid) {
+  public BigDecimal getTotalRefundedAmountBy(UUID referenceUid, UUID customerUid) {
     return jdbcClient
         .sql(
-            "SELECT COALESCE(SUM(amount), 0) FROM transactions "
-                + "WHERE reference_uid = :referenceId AND type = 'PARTIAL_REFUND' AND status IN ('COMPLETED', 'REFUNDED', 'PENDING')")
+            """
+                SELECT COALESCE(SUM(amount), 0)
+                FROM transactions
+                WHERE reference_uid = :referenceId
+                  AND type = 'PARTIAL_REFUND'
+                  AND status IN ('COMPLETED', 'REFUNDED', 'PENDING')
+                  AND customer_id = (SELECT id FROM customers WHERE uid = :customerUid)
+            """)
         .param("referenceId", referenceUid)
+        .param("customerUid", customerUid)
         .query(BigDecimal.class)
         .optional()
         .orElse(BigDecimal.ZERO);
@@ -85,7 +97,7 @@ public class TransactionRepository extends AbstractBaseRepository {
   public TransactionResponse processTransactionByCustomerId(
       Long customerId, TransactionRequest transactionRequest, UUID idempotencyKey) {
     BigDecimal amount = getTransactionAmount(transactionRequest);
-    UUID customerUid = transactionRequest.customerUid();
+    UUID customerUid = ThreadLocalStorage.getSessionUser().uid();
     var tnx = getTransaction(customerId, transactionRequest, idempotencyKey);
     var tnxUid = insertTransaction(tnx);
 

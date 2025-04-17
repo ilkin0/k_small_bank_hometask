@@ -7,9 +7,9 @@ FROM customers
 WHERE uid = '019630c5-eccf-7b24-b814-a39c97c64b8b';
 
 -- Initialize test customer data
-INSERT INTO customers (id, uid, name, surname, birth_date, phone_number, balance)
-VALUES (1, '019630c5-eccf-7b24-b814-a39c97c64b8b', 'Eldar', 'Mammadov', '1985-03-15', '+994501234567', 100.00);
-
+INSERT INTO customers (id, uid, name, surname, birth_date, phone_number, balance, password)
+VALUES (1, '019630c5-eccf-7b24-b814-a39c97c64b8b', 'Eldar', 'Mammadov', '1985-03-15', '+994501234567', 100.00,
+        '$2a$10$f0zqjKXV4MEwHinjHcWUpeeVpeGH55k4FsHqDQhuAxCUmMrV.CmD.');
 
 -- Initialize test transaction data
 INSERT INTO transactions

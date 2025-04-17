@@ -11,6 +11,8 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.CustomerRepository;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.TransactionRepository;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.SessionUser;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.ThreadLocalStorage;
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,14 +31,20 @@ public class TransactionService {
 
   @Transactional
   public TransactionResponse processTransaction(TransactionRequest request, UUID idempotencyKey) {
-    UUID customerUid = request.customerUid();
+    SessionUser sessionUser = ThreadLocalStorage.getSessionUser();
+    if (Objects.isNull(sessionUser)) {
+      log.error("Session user is not set");
+      throw new CustomerNotFoundException("Session user is not found.");
+    }
+
+    UUID customerUid = sessionUser.uid();
     BigDecimal amount = request.amount();
 
     log.info("Top up customer with uid: {}", customerUid);
     validateTransactionRequest(customerUid, amount);
 
     Optional<TransactionResponse> transactionResponseOptional =
-        getTransactionResponseByUid(idempotencyKey);
+        getTransactionResponseByUid(idempotencyKey, customerUid);
 
     if (transactionResponseOptional.isPresent()) {
       return transactionResponseOptional.get();
@@ -57,8 +65,11 @@ public class TransactionService {
       validateRefundTransaction(request.amount(), request.referenceUid(), customer.id());
     }
 
-    return transactionRepository.processTransactionByCustomerId(
-        customer.id(), request, idempotencyKey);
+    var transactionResponse =
+        transactionRepository.processTransactionByCustomerId(
+            customer.id(), request, idempotencyKey);
+    ThreadLocalStorage.clear();
+    return transactionResponse;
   }
 
   private void validateRefundTransaction(
@@ -68,9 +79,11 @@ public class TransactionService {
       throw new NoDataFoundException("Reference transaction ID is required for refunds");
     }
 
+    UUID customerUid = ThreadLocalStorage.getSessionUser().uid();
+
     Transaction originalTnx =
         transactionRepository
-            .findByUid(referenceUid)
+            .findByUid(referenceUid, customerUid)
             .orElseThrow(
                 () -> {
                   log.error("Refund transaction with Reference uid {} not found", referenceUid);
@@ -78,7 +91,7 @@ public class TransactionService {
                       "Refund transaction with Reference uid %s not found".formatted(referenceUid));
                 });
 
-    validateTotalRefundAmount(referenceUid, originalTnx.amount(), refundAmount);
+    validateTotalRefundAmount(referenceUid, customerUid, originalTnx.amount(), refundAmount);
 
     if (!originalTnx.customerId().equals(customerId)) {
       log.error("Refund must be issued to the original customer");
@@ -108,8 +121,8 @@ public class TransactionService {
   }
 
   private void validateTotalRefundAmount(
-      UUID referenceUid, BigDecimal originalAmount, BigDecimal refundAmount) {
-    var refundedAmount = transactionRepository.getTotalRefundedAmountBy(referenceUid);
+      UUID referenceUid, UUID customerUid, BigDecimal originalAmount, BigDecimal refundAmount) {
+    var refundedAmount = transactionRepository.getTotalRefundedAmountBy(referenceUid, customerUid);
     BigDecimal totalRefAmount = refundedAmount.add(refundAmount);
     if (totalRefAmount.compareTo(originalAmount) > 0) {
       throw new TransactionException(
@@ -132,8 +145,9 @@ public class TransactionService {
     }
   }
 
-  private Optional<TransactionResponse> getTransactionResponseByUid(UUID idempotencyKey) {
-    var transactionOptional = transactionRepository.findByUid(idempotencyKey);
+  private Optional<TransactionResponse> getTransactionResponseByUid(
+      UUID idempotencyKey, UUID customerUid) {
+    var transactionOptional = transactionRepository.findByUid(idempotencyKey, customerUid);
     if (transactionOptional.isPresent()) {
       log.warn("Transaction with x-idempotency [{}] already exists", idempotencyKey);
       return Optional.of(mapToTransactionResponse(transactionOptional.get()));

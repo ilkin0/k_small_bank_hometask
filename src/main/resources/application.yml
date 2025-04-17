@@ -29,7 +29,7 @@ spring:
       pem:
         client:
           truststore:
-            certificate: ${SSL_CERT_LOCATION:classpath:cert.pem}
+            certificate: "classpath:cert.pem"
   threads:
     virtual:
       enabled: true
@@ -37,6 +37,9 @@ spring:
     name: k_small_banking
   main:
     banner-mode: off
+  profiles:
+    include:
+      - security
 
 logging:
   level:
@@ -47,3 +50,11 @@ logging:
         web: INFO
     com:
       ilkinmehdiyev: INFO
+
+#security:
+#  jwt-properties:
+#    secret-key: "Y2FzY2FkZS1haS1pcGwtdDIwLXdvcmxkLWN1cC0yMDI0LWRldmVsb3Blci1rbm93bGVkZ2UtYmFzZQ=="
+#    token-validity-in-seconds: 86400
+#    token-validity-in-seconds-for-remember-me: 2592000
+#    refresh-token:
+#      expiration: 604800
