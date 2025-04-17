@@ -14,7 +14,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0ODc2NzU5LCJleHAiOjE3NDQ5NjMxNTksInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.fIwJ29WTIyOs_GPxbPyu_ltrk714lHGrkNPxnfSWAYRhDUv5lScDPOQ9ZEI2duPhoDAlJ4Wir1IAeE-wjONDfw",
+							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0OTE5OTM0LCJleHAiOjE3NDUwMDYzMzQsInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.vCsE2f6byE-SfU9-2F1OCNQzt_Y7p2ZAi-9y8xdjlPJJ58n8dZf8n4P__9x6GtwSkaL8Q5FJHfBZuTGj54BAVQ",
 							"type": "string"
 						}
 					]
@@ -61,7 +61,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0ODc2NzU5LCJleHAiOjE3NDQ5NjMxNTksInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.fIwJ29WTIyOs_GPxbPyu_ltrk714lHGrkNPxnfSWAYRhDUv5lScDPOQ9ZEI2duPhoDAlJ4Wir1IAeE-wjONDfw",
+							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0OTE5OTM0LCJleHAiOjE3NDUwMDYzMzQsInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.vCsE2f6byE-SfU9-2F1OCNQzt_Y7p2ZAi-9y8xdjlPJJ58n8dZf8n4P__9x6GtwSkaL8Q5FJHfBZuTGj54BAVQ",
 							"type": "string"
 						}
 					]
@@ -98,7 +98,111 @@
 					]
 				}
 			},
-			"response": []
+			"response": [
+				{
+					"name": "PURCHASE from customer account",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-idempotency-key",
+								"value": "01963e17-7bcf-7624-99a0-e436d74c3ed4",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"customerUid\": \"019630c5-eccf-7b24-b814-a39c97c64b8b\",\r\n  \"amount\": 17.00,\r\n  \"transactionType\": \"PURCHASE\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://localhost:8080/api/v1/account/transactions",
+							"protocol": "https",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"account",
+								"transactions"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Vary",
+							"value": "Origin"
+						},
+						{
+							"key": "Vary",
+							"value": "Access-Control-Request-Method"
+						},
+						{
+							"key": "Vary",
+							"value": "Access-Control-Request-Headers"
+						},
+						{
+							"key": "X-Content-Type-Options",
+							"value": "nosniff"
+						},
+						{
+							"key": "X-XSS-Protection",
+							"value": "0"
+						},
+						{
+							"key": "Cache-Control",
+							"value": "no-cache, no-store, max-age=0, must-revalidate"
+						},
+						{
+							"key": "Pragma",
+							"value": "no-cache"
+						},
+						{
+							"key": "Expires",
+							"value": "0"
+						},
+						{
+							"key": "Strict-Transport-Security",
+							"value": "max-age=31536000 ; includeSubDomains"
+						},
+						{
+							"key": "X-Frame-Options",
+							"value": "DENY"
+						},
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Transfer-Encoding",
+							"value": "chunked"
+						},
+						{
+							"key": "Date",
+							"value": "Thu, 17 Apr 2025 20:00:42 GMT"
+						},
+						{
+							"key": "Keep-Alive",
+							"value": "timeout=60"
+						},
+						{
+							"key": "Connection",
+							"value": "keep-alive"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"data\": {\n        \"transactionUid\": \"01963e17-7bcf-7624-99a0-e436d74c3ed4\",\n        \"status\": \"COMPLETED\",\n        \"transactionDate\": \"2025-04-16T10:14:44.887690Z\"\n    },\n    \"status\": {\n        \"code\": 200,\n        \"message\": \"\"\n    }\n}"
+				}
+			]
 		},
 		{
 			"name": "REFUND to customer account",
@@ -108,7 +212,7 @@
 					"bearer": [
 						{
 							"key": "token",
-							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0ODc2NzU5LCJleHAiOjE3NDQ5NjMxNTksInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.fIwJ29WTIyOs_GPxbPyu_ltrk714lHGrkNPxnfSWAYRhDUv5lScDPOQ9ZEI2duPhoDAlJ4Wir1IAeE-wjONDfw",
+							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0OTE5OTM0LCJleHAiOjE3NDUwMDYzMzQsInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.vCsE2f6byE-SfU9-2F1OCNQzt_Y7p2ZAi-9y8xdjlPJJ58n8dZf8n4P__9x6GtwSkaL8Q5FJHfBZuTGj54BAVQ",
 							"type": "string"
 						}
 					]
@@ -145,7 +249,107 @@
 					]
 				}
 			},
-			"response": []
+			"response": [
+				{
+					"name": "REFUND to customer account",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-idempotency-key",
+								"value": "01963e19-3a71-7d73-ab75-a4eea63976fd",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"customerUid\": \"019630c5-eccf-7b24-b814-a39c97c64b8b\",\r\n  \"amount\": 9.00,\r\n  \"transactionType\": \"PARTIAL_REFUND\",\r\n  \"referenceUid\": \"01963e17-7bcf-7624-99a0-e436d74c3ed4\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://localhost:8080/api/v1/account/transactions",
+							"protocol": "https",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"account",
+								"transactions"
+							]
+						}
+					},
+					"status": "Bad Request",
+					"code": 400,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Vary",
+							"value": "Origin"
+						},
+						{
+							"key": "Vary",
+							"value": "Access-Control-Request-Method"
+						},
+						{
+							"key": "Vary",
+							"value": "Access-Control-Request-Headers"
+						},
+						{
+							"key": "X-Content-Type-Options",
+							"value": "nosniff"
+						},
+						{
+							"key": "X-XSS-Protection",
+							"value": "0"
+						},
+						{
+							"key": "Cache-Control",
+							"value": "no-cache, no-store, max-age=0, must-revalidate"
+						},
+						{
+							"key": "Pragma",
+							"value": "no-cache"
+						},
+						{
+							"key": "Expires",
+							"value": "0"
+						},
+						{
+							"key": "Strict-Transport-Security",
+							"value": "max-age=31536000 ; includeSubDomains"
+						},
+						{
+							"key": "X-Frame-Options",
+							"value": "DENY"
+						},
+						{
+							"key": "Content-Type",
+							"value": "application/problem+json"
+						},
+						{
+							"key": "Transfer-Encoding",
+							"value": "chunked"
+						},
+						{
+							"key": "Date",
+							"value": "Thu, 17 Apr 2025 20:00:17 GMT"
+						},
+						{
+							"key": "Connection",
+							"value": "close"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"type\": \"errors/bad-request\",\n    \"title\": \"Transaction Failed\",\n    \"status\": 400,\n    \"detail\": \"Total refunded amount [18.000] would exceed original transaction amount [17.000]\",\n    \"instance\": \"/api/v1/account/transactions\",\n    \"errorCategory\": \"BAD_REQUEST\",\n    \"timestamp\": \"2025-04-17T20:00:17.415610333Z\"\n}"
+				}
+			]
 		},
 		{
 			"name": "AUTHENTICATE Customer",
@@ -176,7 +380,109 @@
 					]
 				}
 			},
-			"response": []
+			"response": [
+				{
+					"name": "AUTHENTICATE Customer",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"phoneNumber\": \"+994501234567\",\r\n  \"password\": \"123456\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://localhost:8080/api/v1/auth/sign-in",
+							"protocol": "https",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"sign-in"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Vary",
+							"value": "Origin"
+						},
+						{
+							"key": "Vary",
+							"value": "Access-Control-Request-Method"
+						},
+						{
+							"key": "Vary",
+							"value": "Access-Control-Request-Headers"
+						},
+						{
+							"key": "Set-Cookie",
+							"value": "refreshToken=eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0OTE5OTM0LCJleHAiOjE3NDQ5MjAxOTMsInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.7I9zq-EohoV59L7B7Wp8HAYFjKlidJ9m4aDQzE3eB3pZaIZZaWYsQAoH3ZUC4O9TlIOzgL9f_1petZQz5uFdRA; Path=/auth/refresh-token; HttpOnly"
+						},
+						{
+							"key": "X-Content-Type-Options",
+							"value": "nosniff"
+						},
+						{
+							"key": "X-XSS-Protection",
+							"value": "0"
+						},
+						{
+							"key": "Cache-Control",
+							"value": "no-cache, no-store, max-age=0, must-revalidate"
+						},
+						{
+							"key": "Pragma",
+							"value": "no-cache"
+						},
+						{
+							"key": "Expires",
+							"value": "0"
+						},
+						{
+							"key": "Strict-Transport-Security",
+							"value": "max-age=31536000 ; includeSubDomains"
+						},
+						{
+							"key": "X-Frame-Options",
+							"value": "DENY"
+						},
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Transfer-Encoding",
+							"value": "chunked"
+						},
+						{
+							"key": "Date",
+							"value": "Thu, 17 Apr 2025 19:58:54 GMT"
+						},
+						{
+							"key": "Keep-Alive",
+							"value": "timeout=60"
+						},
+						{
+							"key": "Connection",
+							"value": "keep-alive"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"data\": {\n        \"token\": {\n            \"accessToken\": \"eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0OTE5OTM0LCJleHAiOjE3NDUwMDYzMzQsInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.vCsE2f6byE-SfU9-2F1OCNQzt_Y7p2ZAi-9y8xdjlPJJ58n8dZf8n4P__9x6GtwSkaL8Q5FJHfBZuTGj54BAVQ\",\n            \"refreshToken\": \"eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0OTE5OTM0LCJleHAiOjE3NDQ5MjAxOTMsInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.7I9zq-EohoV59L7B7Wp8HAYFjKlidJ9m4aDQzE3eB3pZaIZZaWYsQAoH3ZUC4O9TlIOzgL9f_1petZQz5uFdRA\"\n        },\n        \"userId\": 1,\n        \"fullName\": \"+994501234567\"\n    },\n    \"status\": {\n        \"code\": 200,\n        \"message\": \"\"\n    }\n}"
+				}
+			]
 		}
 	]
 }
