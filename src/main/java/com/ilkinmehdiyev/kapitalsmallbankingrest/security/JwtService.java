@@ -105,10 +105,6 @@ public class JwtService {
         .forEach(auth -> claimsMap.put("authority", auth));
   }
 
-  private Duration getDuration(boolean remember) {
-    return remember ? Duration.of(1, ChronoUnit.DAYS) : Duration.of(3, ChronoUnit.HOURS);
-  }
-
   private SecretKey getSignInKey(String secret) {
     byte[] keyBytes = Decoders.BASE64.decode(secret);
     return Keys.hmacShaKeyFor(keyBytes);

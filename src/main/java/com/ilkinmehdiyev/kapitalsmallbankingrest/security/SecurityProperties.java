@@ -17,11 +17,5 @@ public class SecurityProperties {
       RefreshToken refreshToken) {
 
     public record RefreshToken(long expiration) {}
-    //
-    //    @Getter
-    //    @Setter
-    //    public static class RefreshToken {
-    //      private long expiration;
-    //    }
   }
 }
