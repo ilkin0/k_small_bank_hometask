@@ -1,5 +1,6 @@
 package com.ilkinmehdiyev.kapitalsmallbankingrest.controller;
 
+import static com.ilkinmehdiyev.kapitalsmallbankingrest.common.HttpHeaders.X_IDEMPOTENCY_KEY;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -14,6 +15,8 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.initalizer.PostgresSQLEmbeddedContainer;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.security.JwtService;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.service.CustomerServiceImpl.CustomUserDetails;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.service.TransactionService;
 import io.restassured.RestAssured;
 import io.restassured.config.LogConfig;
@@ -29,17 +32,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Profile;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@Profile("application-test.yml")
 @ContextConfiguration(initializers = {PostgresSQLEmbeddedContainer.Initializer.class})
 @Import(TestLiquibaseConfig.class)
 class TransactionControllerTest {
@@ -48,10 +49,12 @@ class TransactionControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private TransactionService transactionService;
+  @Autowired private JwtService jwtService;
 
   private final UUID customerUid = UUID.fromString("019630c5-eccf-7b24-b814-a39c97c64b8b");
   private final UUID transactionUid = UUID.randomUUID();
   private final String baseUrl = "/api/v1/account/transactions";
+  private String jwtToken;
 
   @BeforeEach
   void setUp() {
@@ -70,6 +73,8 @@ class TransactionControllerTest {
                     .relaxedHTTPSValidation()
                     .keyStore("classpath:keystore.p12", "QTntL1pa4QrJcf5R")
                     .keystoreType("PKCS12"));
+
+    generateJwtToken();
   }
 
   @Test
@@ -77,7 +82,7 @@ class TransactionControllerTest {
   void shouldProcessTopUpTransaction() throws Exception {
     UUID idempotencyKey = UUID.randomUUID();
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("100.00"), null);
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("100.00"), null);
     TransactionResponse mockResponse =
         new TransactionResponse(transactionUid, TransactionStatus.COMPLETED, Instant.now());
 
@@ -86,7 +91,8 @@ class TransactionControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .header("x-idempotency-key", idempotencyKey.toString())
+        .header("Authorization", "Bearer " + jwtToken)
+        .header(X_IDEMPOTENCY_KEY, idempotencyKey.toString())
         .body(objectMapper.writeValueAsString(request))
         .when()
         .post(baseUrl)
@@ -104,8 +110,7 @@ class TransactionControllerTest {
   void shouldProcessPurchaseTransaction() throws Exception {
     UUID idempotencyKey = UUID.randomUUID();
     TransactionRequest request =
-        new TransactionRequest(
-            TransactionType.PURCHASE, customerUid, new BigDecimal("50.00"), null);
+        new TransactionRequest(TransactionType.PURCHASE, new BigDecimal("50.00"), null);
     TransactionResponse mockResponse =
         new TransactionResponse(transactionUid, TransactionStatus.COMPLETED, Instant.now());
 
@@ -114,7 +119,8 @@ class TransactionControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .header("x-idempotency-key", idempotencyKey.toString())
+        .header("Authorization", "Bearer " + jwtToken)
+        .header(X_IDEMPOTENCY_KEY, idempotencyKey.toString())
         .body(objectMapper.writeValueAsString(request))
         .when()
         .post(baseUrl)
@@ -135,10 +141,7 @@ class TransactionControllerTest {
 
     TransactionRequest request =
         new TransactionRequest(
-            TransactionType.PARTIAL_REFUND,
-            customerUid,
-            new BigDecimal("25.00"),
-            referenceTransactionUid);
+            TransactionType.PARTIAL_REFUND, new BigDecimal("25.00"), referenceTransactionUid);
 
     TransactionResponse mockResponse =
         new TransactionResponse(transactionUid, TransactionStatus.REFUNDED, Instant.now());
@@ -148,7 +151,8 @@ class TransactionControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .header("x-idempotency-key", idempotencyKey.toString())
+        .header("Authorization", "Bearer " + jwtToken)
+        .header(X_IDEMPOTENCY_KEY, idempotencyKey.toString())
         .body(objectMapper.writeValueAsString(request))
         .when()
         .post(baseUrl)
@@ -165,10 +169,11 @@ class TransactionControllerTest {
   @DisplayName("Should return 400 for missing idempotency key header")
   void shouldReturn400ForMissingIdempotencyKeyHeader() throws Exception {
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("100.00"), null);
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("100.00"), null);
 
     given()
         .contentType(ContentType.JSON)
+        .header("Authorization", "Bearer " + jwtToken)
         .body(objectMapper.writeValueAsString(request))
         .when()
         .post(baseUrl)
@@ -183,7 +188,7 @@ class TransactionControllerTest {
   void shouldReturnSameResponseForDuplicateIdempotencyKey() throws Exception {
     UUID idempotencyKey = UUID.randomUUID();
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("100.00"), null);
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("100.00"), null);
     TransactionResponse mockResponse =
         new TransactionResponse(transactionUid, TransactionStatus.COMPLETED, Instant.now());
 
@@ -192,7 +197,8 @@ class TransactionControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .header("x-idempotency-key", idempotencyKey.toString())
+        .header("Authorization", "Bearer " + jwtToken)
+        .header(X_IDEMPOTENCY_KEY, idempotencyKey.toString())
         .body(objectMapper.writeValueAsString(request))
         .when()
         .post(baseUrl)
@@ -204,7 +210,8 @@ class TransactionControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .header("x-idempotency-key", idempotencyKey.toString())
+        .header("Authorization", "Bearer " + jwtToken)
+        .header(X_IDEMPOTENCY_KEY, idempotencyKey.toString())
         .body(objectMapper.writeValueAsString(request))
         .when()
         .post(baseUrl)
@@ -213,5 +220,12 @@ class TransactionControllerTest {
         .ifValidationFails()
         .statusCode(HttpStatus.OK.value())
         .body("data.transactionUid", is(transactionUid.toString()));
+  }
+
+  private void generateJwtToken() {
+    CustomUserDetails userDetails =
+        new CustomUserDetails(1L, customerUid, "password", "+994501234567");
+
+    jwtToken = jwtService.generateAccessToken(userDetails);
   }
 }

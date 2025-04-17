@@ -91,8 +91,8 @@ class CustomerRepositoryTest {
     jdbcClient
         .sql(
             """
-                    INSERT INTO customers (uid, name, surname, balance, phone_number, birth_date)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO customers (uid, name, surname, balance, phone_number, birth_date, password)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """)
         .params(
             existingCustomerUid,
@@ -100,7 +100,8 @@ class CustomerRepositoryTest {
             "Mammadov",
             new BigDecimal("100.00"),
             "+994501234567",
-            LocalDate.now().minusYears(25))
+            LocalDate.now().minusYears(25),
+                "$2a$10$f0zqjKXV4MEwHinjHcWUpeeVpeGH55k4FsHqDQhuAxCUmMrV.CmD.")
         .update();
   }
 }

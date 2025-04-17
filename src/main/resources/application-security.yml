@@ -1,0 +1,8 @@
+security:
+  jwtProperties:
+    #  jwt:
+    secretKey: 423F4528482B4D6251655468576D597133743677397A24432646294A404E635266556A586E327234753778214125442A472D4B6150645367566B597033733676
+    tokenValidityInSeconds: 86400000 # a day
+    tokenValidityInSecondsForRememberMe: 259200 # 3 days
+    refresh-token:
+      expiration: 604800000 # 7 days

@@ -13,4 +13,10 @@ public record Customer(
     String surname,
     LocalDate birthDate,
     String phoneNumber,
-    BigDecimal balance) {}
+    BigDecimal balance,
+    String password) {
+
+  public String fullName() {
+    return name + " " + surname;
+  }
+}

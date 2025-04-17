@@ -19,6 +19,8 @@ import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionStatus;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.model.enums.TransactionType;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.CustomerRepository;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.repository.TransactionRepository;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.SessionUser;
+import com.ilkinmehdiyev.kapitalsmallbankingrest.utils.ThreadLocalStorage;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -49,6 +51,9 @@ class TransactionServiceUTest {
     customerUid = UUID.randomUUID();
     transactionUid = UUID.randomUUID();
 
+    SessionUser sessionUser = new SessionUser(1L, customerUid, "+994501234567");
+    ThreadLocalStorage.setSessionUser(sessionUser);
+
     testCustomer =
         Customer.builder()
             .id(1L)
@@ -76,12 +81,12 @@ class TransactionServiceUTest {
   @DisplayName("Should successfully process a top-up transaction")
   void shouldProcessTopUpTransaction() {
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("50.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
     when(transactionRepository.processTransactionByCustomerId(
             testCustomer.id(), request, idempotencyKey))
         .thenReturn(
@@ -94,7 +99,7 @@ class TransactionServiceUTest {
     assertThat(response.status()).isEqualTo(TransactionStatus.COMPLETED);
 
     verify(customerRepository).getCustomerByUidForUpdate(customerUid);
-    verify(transactionRepository).findByUid(idempotencyKey);
+    verify(transactionRepository).findByUid(idempotencyKey, customerUid);
     verify(transactionRepository)
         .processTransactionByCustomerId(testCustomer.id(), request, idempotencyKey);
   }
@@ -103,12 +108,12 @@ class TransactionServiceUTest {
   @DisplayName("Should successfully process a purchase transaction with sufficient balance")
   void shouldProcessPurchaseTransactionWithSufficientBalance() {
     TransactionRequest request =
-        new TransactionRequest(TransactionType.PURCHASE, customerUid, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.PURCHASE, new BigDecimal("50.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
     when(transactionRepository.processTransactionByCustomerId(
             testCustomer.id(), request, idempotencyKey))
         .thenReturn(
@@ -136,12 +141,12 @@ class TransactionServiceUTest {
             .build();
 
     TransactionRequest request =
-        new TransactionRequest(TransactionType.PURCHASE, customerUid, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.PURCHASE, new BigDecimal("50.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(lowBalanceCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
         .isInstanceOf(TransferRequestException.class)
@@ -154,10 +159,10 @@ class TransactionServiceUTest {
   @DisplayName("Should return existing transaction when processing with same idempotency key")
   void shouldReturnExistingTransactionWhenProcessingWithSameIdempotencyKey() {
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("50.00"), null);
     UUID idempotencyKey = transactionUid;
 
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.of(testTransaction));
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.of(testTransaction));
 
     TransactionResponse response = transactionService.processTransaction(request, idempotencyKey);
 
@@ -173,11 +178,11 @@ class TransactionServiceUTest {
   @DisplayName("Should throw exception when customer is not found")
   void shouldThrowExceptionWhenCustomerIsNotFound() {
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("50.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
         .isInstanceOf(CustomerNotFoundException.class)
@@ -185,17 +190,19 @@ class TransactionServiceUTest {
   }
 
   @Test
-  @DisplayName("Should throw exception when customer uid is null")
-  void shouldThrowExceptionWhenCustomerUidIsNull() {
+  @DisplayName("Should throw exception when session user is null")
+  void shouldThrowExceptionWhenSessionUserIsNull() {
+    ThreadLocalStorage.clear();
+    
     TransactionRequest request =
-        new TransactionRequest(TransactionType.TOP_UP, null, new BigDecimal("50.00"));
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("50.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
-        .isInstanceOf(NoDataFoundException.class)
-        .hasMessageContaining("Customer ID is required");
+        .isInstanceOf(CustomerNotFoundException.class)
+        .hasMessageContaining("Session user is not found.");
 
-    verify(transactionRepository, never()).findByUid(any());
+    verify(transactionRepository, never()).findByUid(idempotencyKey, null);
     verify(customerRepository, never()).getCustomerByUidForUpdate(any());
   }
 
@@ -203,7 +210,7 @@ class TransactionServiceUTest {
   @DisplayName("Should throw exception when amount is negative or zero")
   void shouldThrowExceptionWhenAmountIsNegativeOrZero() {
     TransactionRequest zeroRequest =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, BigDecimal.ZERO);
+        new TransactionRequest(TransactionType.TOP_UP, BigDecimal.ZERO, null);
     UUID idempotencyKey = UUID.randomUUID();
 
     assertThatThrownBy(() -> transactionService.processTransaction(zeroRequest, idempotencyKey))
@@ -211,7 +218,7 @@ class TransactionServiceUTest {
         .hasMessageContaining("Amount must be greater than zero");
 
     TransactionRequest negativeRequest =
-        new TransactionRequest(TransactionType.TOP_UP, customerUid, new BigDecimal("-10.00"));
+        new TransactionRequest(TransactionType.TOP_UP, new BigDecimal("-10.00"), null);
 
     assertThatThrownBy(() -> transactionService.processTransaction(negativeRequest, idempotencyKey))
         .isInstanceOf(TransferRequestException.class)
@@ -236,15 +243,15 @@ class TransactionServiceUTest {
     BigDecimal refundAmount = new BigDecimal("30.00");
     TransactionRequest request =
         new TransactionRequest(
-            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, referenceTransactionUid);
+            TransactionType.PARTIAL_REFUND, refundAmount, referenceTransactionUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(referenceTransactionUid))
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid, customerUid))
         .thenReturn(Optional.of(referenceTransaction));
-    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid, customerUid))
         .thenReturn(BigDecimal.ZERO);
     when(transactionRepository.processTransactionByCustomerId(
             testCustomer.id(), request, idempotencyKey))
@@ -256,8 +263,8 @@ class TransactionServiceUTest {
     assertThat(response).isNotNull();
     assertThat(response.status()).isEqualTo(TransactionStatus.REFUNDED);
 
-    verify(transactionRepository).findByUid(referenceTransactionUid);
-    verify(transactionRepository).getTotalRefundedAmountBy(referenceTransactionUid);
+    verify(transactionRepository).findByUid(referenceTransactionUid, customerUid);
+    verify(transactionRepository).getTotalRefundedAmountBy(referenceTransactionUid, customerUid);
     verify(transactionRepository)
         .processTransactionByCustomerId(testCustomer.id(), request, idempotencyKey);
   }
@@ -280,15 +287,15 @@ class TransactionServiceUTest {
     BigDecimal refundAmount = new BigDecimal("75.00");
     TransactionRequest request =
         new TransactionRequest(
-            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, referenceTransactionUid);
+            TransactionType.PARTIAL_REFUND, refundAmount, referenceTransactionUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(referenceTransactionUid))
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid, customerUid))
         .thenReturn(Optional.of(referenceTransaction));
-    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid, customerUid))
         .thenReturn(BigDecimal.ZERO);
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
@@ -314,17 +321,16 @@ class TransactionServiceUTest {
     TransactionRequest request =
         new TransactionRequest(
             TransactionType.PARTIAL_REFUND,
-            customerUid,
             new BigDecimal("30.00"),
             referenceTransactionUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(referenceTransactionUid))
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid, customerUid))
         .thenReturn(Optional.of(referenceTransaction));
-    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid, customerUid))
         .thenReturn(BigDecimal.ZERO);
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
@@ -350,17 +356,16 @@ class TransactionServiceUTest {
     TransactionRequest request =
         new TransactionRequest(
             TransactionType.PARTIAL_REFUND,
-            customerUid,
             new BigDecimal("30.00"),
             referenceTransactionUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(referenceTransactionUid))
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid, customerUid))
         .thenReturn(Optional.of(referenceTransaction));
-    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid, customerUid))
         .thenReturn(BigDecimal.ZERO);
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
@@ -388,15 +393,15 @@ class TransactionServiceUTest {
 
     TransactionRequest request =
         new TransactionRequest(
-            TransactionType.PARTIAL_REFUND, customerUid, refundAmount, referenceTransactionUid);
+            TransactionType.PARTIAL_REFUND, refundAmount, referenceTransactionUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(referenceTransactionUid))
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(referenceTransactionUid, customerUid))
         .thenReturn(Optional.of(referenceTransaction));
-    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid))
+    when(transactionRepository.getTotalRefundedAmountBy(referenceTransactionUid, customerUid))
         .thenReturn(previousRefunds);
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
@@ -412,15 +417,14 @@ class TransactionServiceUTest {
     TransactionRequest request =
         new TransactionRequest(
             TransactionType.PARTIAL_REFUND,
-            customerUid,
             new BigDecimal("30.00"),
             nonExistentReferenceUid);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
-    when(transactionRepository.findByUid(nonExistentReferenceUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(nonExistentReferenceUid, customerUid)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
         .isInstanceOf(NoDataFoundException.class)
@@ -432,12 +436,12 @@ class TransactionServiceUTest {
   void shouldThrowExceptionWhenRefundReferenceUidIsNull() {
     TransactionRequest request =
         new TransactionRequest(
-            TransactionType.PARTIAL_REFUND, customerUid, new BigDecimal("30.00"), null);
+            TransactionType.PARTIAL_REFUND, new BigDecimal("30.00"), null);
     UUID idempotencyKey = UUID.randomUUID();
 
     when(customerRepository.getCustomerByUidForUpdate(customerUid))
         .thenReturn(Optional.of(testCustomer));
-    when(transactionRepository.findByUid(idempotencyKey)).thenReturn(Optional.empty());
+    when(transactionRepository.findByUid(idempotencyKey, customerUid)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> transactionService.processTransaction(request, idempotencyKey))
         .isInstanceOf(NoDataFoundException.class)

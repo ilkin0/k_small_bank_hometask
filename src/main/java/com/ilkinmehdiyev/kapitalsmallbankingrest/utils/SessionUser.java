@@ -1,12 +1,5 @@
 package com.ilkinmehdiyev.kapitalsmallbankingrest.utils;
 
-import lombok.Data;
+import java.util.UUID;
 
-@Data
-public class SessionUser {
-
-  private Long userId;
-  private String userIpAddress;
-  private String timeZone;
-  private String role;
-}
+public record SessionUser(Long userId, UUID uid, String phoneNumber) {}

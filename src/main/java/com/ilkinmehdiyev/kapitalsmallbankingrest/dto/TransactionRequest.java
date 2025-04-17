@@ -8,11 +8,10 @@ import java.util.UUID;
 
 public record TransactionRequest(
     @NotNull TransactionType transactionType,
-    @NotNull UUID customerUid,
     @Positive(message = "{topup.amount}") BigDecimal amount,
     UUID referenceUid) {
 
-  public TransactionRequest(TransactionType transactionType, UUID customerUid, BigDecimal amount) {
-    this(transactionType, customerUid, amount, null);
+  public TransactionRequest(TransactionType transactionType, BigDecimal amount) {
+    this(transactionType, amount, null);
   }
 }

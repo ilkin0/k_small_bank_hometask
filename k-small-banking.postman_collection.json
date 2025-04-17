@@ -1,0 +1,182 @@
+{
+	"info": {
+		"_postman_id": "a8b09dd6-3bcf-45cc-b9cb-27124571f810",
+		"name": "k-small-banking",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11472780"
+	},
+	"item": [
+		{
+			"name": "TopUp to customer account",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0ODc2NzU5LCJleHAiOjE3NDQ5NjMxNTksInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.fIwJ29WTIyOs_GPxbPyu_ltrk714lHGrkNPxnfSWAYRhDUv5lScDPOQ9ZEI2duPhoDAlJ4Wir1IAeE-wjONDfw",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "x-idempotency-key",
+						"value": "01963e1c-75a3-7b26-ac42-11e4202e6b0b",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"customerUid\": \"019630c5-eccf-7b24-b814-a39c97c64b8b\",\r\n  \"amount\": 47.00,\r\n  \"transactionType\": \"TOP_UP\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://localhost:8080/api/v1/account/transactions",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"account",
+						"transactions"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "PURCHASE from customer account",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0ODc2NzU5LCJleHAiOjE3NDQ5NjMxNTksInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.fIwJ29WTIyOs_GPxbPyu_ltrk714lHGrkNPxnfSWAYRhDUv5lScDPOQ9ZEI2duPhoDAlJ4Wir1IAeE-wjONDfw",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "x-idempotency-key",
+						"value": "01963e17-7bcf-7624-99a0-e436d74c3ed4",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"customerUid\": \"019630c5-eccf-7b24-b814-a39c97c64b8b\",\r\n  \"amount\": 17.00,\r\n  \"transactionType\": \"PURCHASE\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://localhost:8080/api/v1/account/transactions",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"account",
+						"transactions"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "REFUND to customer account",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIrOTk0NTAxMjM0NTY3IiwiaWF0IjoxNzQ0ODc2NzU5LCJleHAiOjE3NDQ5NjMxNTksInVzZXJuYW1lIjoiKzk5NDUwMTIzNDU2NyJ9.fIwJ29WTIyOs_GPxbPyu_ltrk714lHGrkNPxnfSWAYRhDUv5lScDPOQ9ZEI2duPhoDAlJ4Wir1IAeE-wjONDfw",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "x-idempotency-key",
+						"value": "01963e19-3a71-7d73-ab75-a4eea63976fd",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"customerUid\": \"019630c5-eccf-7b24-b814-a39c97c64b8b\",\r\n  \"amount\": 9.00,\r\n  \"transactionType\": \"PARTIAL_REFUND\",\r\n  \"referenceUid\": \"01963e17-7bcf-7624-99a0-e436d74c3ed4\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://localhost:8080/api/v1/account/transactions",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"account",
+						"transactions"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "AUTHENTICATE Customer",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"phoneNumber\": \"+994501234567\",\r\n  \"password\": \"123456\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://localhost:8080/api/v1/auth/sign-in",
+					"protocol": "https",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"auth",
+						"sign-in"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

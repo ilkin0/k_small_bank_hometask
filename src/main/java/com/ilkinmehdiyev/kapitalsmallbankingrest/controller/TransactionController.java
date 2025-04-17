@@ -1,5 +1,7 @@
 package com.ilkinmehdiyev.kapitalsmallbankingrest.controller;
 
+import static com.ilkinmehdiyev.kapitalsmallbankingrest.common.HttpHeaders.X_IDEMPOTENCY_KEY;
+
 import com.ilkinmehdiyev.kapitalsmallbankingrest.common.ResponseTemplate;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionRequest;
 import com.ilkinmehdiyev.kapitalsmallbankingrest.dto.TransactionResponse;
@@ -26,10 +28,9 @@ public class TransactionController {
 
   @PostMapping
   public ResponseEntity<ResponseTemplate<TransactionResponse>> makeTransaction(
-      @RequestHeader("x-idempotency-key") UUID idempotencyKey,
+      @RequestHeader(X_IDEMPOTENCY_KEY) UUID idempotencyKey,
       @Valid @RequestBody TransactionRequest request) {
-    log.info(
-        "Customer [{}] requested {} transaction", request.customerUid(), request.transactionType());
+    log.info("Requested {} transaction", request.transactionType());
     var response = transactionService.processTransaction(request, idempotencyKey);
 
     return new ResponseEntity<>(
