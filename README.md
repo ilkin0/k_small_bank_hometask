@@ -16,7 +16,7 @@ various banking operations.
 - **Backend**: Java 21, Spring Boot 3.4.x, Spring Security 6, Spring Data JDBC
 - **Database**: PostgreSQL
 - **Security**: JWT Authentication, HTTPS/SSL
-- **Testing**: JUnit 5, Mockito, RestAssured
+- **Testing**: JUnit 5, Mockito, AssertJ, TestContainers, RestAssured
 - **Build Tool**: Gradle
 - **Containerization**: Docker, Docker Compose
 - **API Docs**: Postman Collection

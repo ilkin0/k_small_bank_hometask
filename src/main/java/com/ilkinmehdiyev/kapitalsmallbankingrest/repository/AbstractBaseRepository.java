@@ -11,11 +11,7 @@ import java.util.Optional;
 
 public class AbstractBaseRepository {
   public static final String ID = "id";
-  public static final String NAME = "name";
-  public static final String CREATED_AT = "created_at";
-  public static final String UPDATED_AT = "updated_at";
   public static final String UID = "uid";
-  public static final String CREATED_BY = "created_by";
   public static final String CUSTOMER_ID = "customer_id";
   public static final String AMOUNT = "amount";
   public static final String DESCRIPTION = "description";
